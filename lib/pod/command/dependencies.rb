@@ -4,97 +4,63 @@ module Pod
       self.summary = "Show project's dependency graph."
 
       self.description = <<-DESC
-        Shows the project's dependency graph.
+      Shows the project's dependency graph.
       DESC
-
-      def self.options
-        [
-          ['--ignore-lockfile', 'Whether the lockfile should be ignored when calculating the dependency graph'],
-          ['--repo-update', 'Fetch external podspecs and run `pod repo update` before calculating the dependency graph'],
-        ].concat(super)
-      end
 
       def self.arguments
         [
-          CLAide::Argument.new('PODSPEC', false)
+          CLAide::Argument.new('SOURCE', false),
+          CLAide::Argument.new('SPECNAME', false)
         ].concat(super)
       end
 
       def initialize(argv)
+        @source_name_or_url = argv.shift_argument
         @podspec_name = argv.shift_argument
-        @ignore_lockfile = argv.flag?('ignore-lockfile', false)
-        @repo_update = argv.flag?('repo-update', false)
         super
       end
 
       def validate!
         super
+        if @source_name_or_url
+          @source = SourcesManager.source_with_name_or_url(@source_name_or_url)
+        end
         if @podspec_name
-          require 'pathname'
-          path = Pathname.new(@podspec_name)
-          if path.exist?
-            @podspec = Specification.from_file(path)
-          else
-            @podspec = SourcesManager.
-              search(Dependency.new(@podspec_name)).
-              specification.
-              subspec_by_name(@podspec_name)
-          end
+          @podspec = SourcesManager
+          .search(Dependency.new(@podspec_name))
+          .specification
+          .subspec_by_name(@podspec_name)
         end
       end
 
       def run
         UI.title 'Dependencies' do
           require 'yaml'
-          UI.puts dependencies.to_yaml
+          UI.puts "Upwards (pods with dependency to #{@podspec_name}):"
+          upwards = search(@podspec_name, true)
+          UI.puts upwards.to_yaml
+          UI.puts "Downwards (dependencies of #{@podspec_name}):"
+          downwards = search(@podspec_name, false)
+          UI.puts downwards.to_yaml
         end
       end
 
-      def dependencies
-        @dependencies ||= begin
-          analyzer = Installer::Analyzer.new(
-            sandbox,
-            podfile,
-            @ignore_lockfile || @podspec ? nil : config.lockfile
-          )
-
-          integrate_targets = config.integrate_targets
-          skip_repo_update = config.skip_repo_update?
-          config.integrate_targets = false
-          config.skip_repo_update = !@repo_update
-          specs = analyzer.analyze(@repo_update || @podspec).specs_by_target.values.flatten(1)
-          config.integrate_targets = integrate_targets
-          config.skip_repo_update = skip_repo_update
-
-          lockfile = Lockfile.generate(podfile, specs, {})
-          pods = lockfile.to_hash['PODS']
+      def latest_specifications
+        latest_specifications ||= begin
+          @source.pods.map { |pod| @source.specification(pod, @source.versions(pod).first) }
         end
       end
 
-      def podfile
-        @podfile ||= begin
-          if podspec = @podspec
-            platform = podspec.available_platforms.first
-            platform_name, platform_version = platform.name, platform.deployment_target.to_s
-            sources = SourcesManager.all.map(&:url)
-            Podfile.new do
-              sources.each { |s| source s }
-              platform platform_name, platform_version
-              pod podspec.name, podspec: podspec.defined_in_file
-            end
-          else
-            verify_podfile_exists!
-            config.podfile
-          end
-        end
-      end
-
-      def sandbox
-        if @podspec
-          require 'tmpdir'
-          Sandbox.new(Dir.mktmpdir)
-        else
-          config.sandbox
+      def search(spec_name, upwards)
+        search_downwards ||= begin
+          latest_specifications.select { |specification| 
+            upwards ? Specification.root_name(specification.name.to_s) != spec_name : Specification.root_name(specification.name.to_s) == spec_name
+          }.map { |specification|
+            recusive_dependencies = specification.all_dependencies + specification.recursive_subspecs.flatten.map { |subspecSpecification| subspecSpecification.all_dependencies }.flatten
+            recusive_dependencies.select { |dependency|
+              upwards ? dependency.name.to_s.split('/').first == spec_name : dependency.name.to_s.split('/').first != spec_name
+            }.map { |dependency| "#{specification.name.to_s.split('/').first} -> #{dependency.name.to_s.split('/').first}"}.uniq.sort
+          }.select { |array| !array.empty? }
         end
       end
 

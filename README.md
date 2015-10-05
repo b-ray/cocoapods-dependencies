@@ -8,11 +8,12 @@ Shows a project's CocoaPod dependency graph.
 ## Installation
 
 ```bash
-$ [sudo] gem install cocoapods-dependencies
+$ [sudo] gem install specific_install
+$ [sudo] gem specific_install -l https://github.com/b-ray/cocoapods-dependencies.git
 ```
 
 ## Usage
 
 ```bash
-$ pod dependencies [PODSPEC]
+$ pod dependencies [PODFILE]
 ```

@@ -1,11 +1,11 @@
 # cocoapods-dependencies
 
-[![Gem Version](https://badge.fury.io/rb/cocoapods-dependencies.svg)](http://badge.fury.io/rb/cocoapods-dependencies)
-[![Code Climate](https://codeclimate.com/github/segiddins/cocoapods-dependencies.png)](https://codeclimate.com/github/segiddins/cocoapods-dependencies)
-
-Shows a project's CocoaPod dependency graph.
+Based on the default cocoapods-dependencies plugin, but with a slightly different usage.
+Shows a project's CocoaPod dependency graph with both upward (pods with dependency to the specified library) and downward dependencies (dependencies of the current library).
 
 ## Installation
+
+Currently, the plugin has to be installed as follows and replaces the default cocoapods-dependencies plugin.
 
 ```bash
 $ [sudo] gem install specific_install
@@ -15,5 +15,37 @@ $ [sudo] gem specific_install -l https://github.com/b-ray/cocoapods-dependencies
 ## Usage
 
 ```bash
-$ pod dependencies [PODFILE]
+$ pod dependencies [REPO] [PODNAME]
+```
+
+e.g. printing the dependencies of the `Google`-library:
+
+```bash
+$ pod dependencies master Google
+```
+
+prints:
+
+```bash
+Dependencies
+Upwards (pods with dependency to Google):
+---
+- - ARAnalytics -> Google
+- - AppFriends -> Google
+- - GoogleAnalyticsHelper -> Google
+- - LiquidEventsInterceptor -> Google
+- - Lock-Google -> Google
+- - TAKGAUtil -> Google
+Downwards (dependencies of Google):
+---
+- - Google -> AppInvites
+  - Google -> GGLInstanceID
+  - Google -> GoogleAnalytics
+  - Google -> GoogleCloudMessaging
+  - Google -> GoogleInterchangeUtilities
+  - Google -> GoogleMobileAds
+  - Google -> GoogleNetworkingUtilities
+  - Google -> GoogleSignIn
+  - Google -> GoogleSymbolUtilities
+  - Google -> GoogleUtilities
 ```
